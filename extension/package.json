@@ -1,0 +1,133 @@
+{
+  "name": "wavecode",
+  "displayName": "WaveCode",
+  "description": "Control VS Code with low-latency hand gestures.",
+  "version": "0.1.0",
+  "publisher": "wavecode",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished",
+    "onView:wavecode.sidebar",
+    "onCommand:wavecode.toggleDetection",
+    "onCommand:wavecode.reconnectBackend",
+    "onCommand:wavecode.restartBackend",
+    "onCommand:wavecode.openSettings"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "wavecode",
+          "title": "WaveCode",
+          "icon": "media/wavecode.svg"
+        }
+      ]
+    },
+    "views": {
+      "wavecode": [
+        {
+          "id": "wavecode.sidebar",
+          "name": "WaveCode",
+          "type": "webview"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "wavecode.toggleDetection",
+        "title": "WaveCode: Toggle Detection"
+      },
+      {
+        "command": "wavecode.reconnectBackend",
+        "title": "WaveCode: Reconnect Backend"
+      },
+      {
+        "command": "wavecode.restartBackend",
+        "title": "WaveCode: Restart Backend"
+      },
+      {
+        "command": "wavecode.openSettings",
+        "title": "WaveCode: Open Settings"
+      }
+    ],
+    "configuration": {
+      "title": "WaveCode",
+      "properties": {
+        "wavecode.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable gesture detection and command execution."
+        },
+        "wavecode.recognitionThreshold": {
+          "type": "number",
+          "default": 0.8,
+          "minimum": 0.5,
+          "maximum": 0.99,
+          "description": "Minimum confidence required before WaveCode executes an action."
+        },
+        "wavecode.cooldownMs": {
+          "type": "number",
+          "default": 1000,
+          "minimum": 250,
+          "description": "Cooldown window before the same gesture can trigger again."
+        },
+        "wavecode.autoStartBackend": {
+          "type": "boolean",
+          "default": true,
+          "description": "Start the local Python backend automatically when the extension activates."
+        },
+        "wavecode.pythonPath": {
+          "type": "string",
+          "default": "python3",
+          "description": "Python executable used to launch the WaveCode backend."
+        },
+        "wavecode.backendHost": {
+          "type": "string",
+          "default": "127.0.0.1",
+          "description": "Host used by the local WaveCode backend."
+        },
+        "wavecode.backendPort": {
+          "type": "number",
+          "default": 8765,
+          "description": "Port used by the local WaveCode backend."
+        },
+        "wavecode.gestureMappings": {
+          "type": "object",
+          "default": {
+            "thumbs_up": "workbench.action.files.save",
+            "peace": "workbench.action.terminal.toggleTerminal",
+            "fist": "workbench.action.showCommands",
+            "point": "workbench.action.nextEditor",
+            "open_palm": "workbench.action.toggleSidebarVisibility"
+          },
+          "description": "Command mappings for each supported gesture."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "node ./scripts/prepare-backend.mjs && npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "clean": "node -e \"const fs=require('node:fs'); fs.rmSync('dist',{recursive:true,force:true}); fs.rmSync('vendor',{recursive:true,force:true});\"",
+    "package": "vsce package",
+    "lint": "tsc --noEmit -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.10",
+    "@types/vscode": "^1.90.0",
+    "@types/ws": "^8.5.12",
+    "typescript": "^5.5.4",
+    "vsce": "^2.15.0"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}
