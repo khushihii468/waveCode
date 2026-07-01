@@ -10,6 +10,7 @@ class WaveCodeController implements vscode.Disposable {
   private readonly outputChannel = vscode.window.createOutputChannel('WaveCode');
   private readonly statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
   private readonly lastGestureExecution = new Map<GestureId, number>();
+  private lastCommandExecutionAt = 0;
   private readonly sidebar: WaveCodeSidebarProvider;
   private readonly backendProcess: BackendProcessManager;
   private readonly websocketClient: GestureWebSocketClient;
@@ -173,7 +174,15 @@ class WaveCodeController implements vscode.Disposable {
       reconnecting: 'Reconnecting',
     };
 
+    const cameraStatusMap: Record<ConnectionState, string> = {
+      connected: '🟢 Camera Connected',
+      connecting: 'Starting camera...',
+      disconnected: '🔴 Camera Offline',
+      reconnecting: 'Reconnecting camera...',
+    };
+
     this.sidebar.updateState({
+      cameraStatus: cameraStatusMap[state],
       connectionStatus: labelMap[state],
       statusMessage: state === 'connected' ? 'Listening...' : labelMap[state],
     });
@@ -208,7 +217,8 @@ class WaveCodeController implements vscode.Disposable {
 
     const lastExecution = this.lastGestureExecution.get(prediction.gesture) ?? 0;
     const now = Date.now();
-    if (now - lastExecution < this.settings.cooldownMs) {
+    const globalCooldownRemaining = now - this.lastCommandExecutionAt < this.settings.cooldownMs;
+    if (now - lastExecution < this.settings.cooldownMs || globalCooldownRemaining) {
       this.sidebar.updateState({
         statusMessage: 'Gesture cooling down',
       });
@@ -217,6 +227,7 @@ class WaveCodeController implements vscode.Disposable {
     }
 
     this.lastGestureExecution.set(prediction.gesture, now);
+    this.lastCommandExecutionAt = now;
 
     try {
       const actionLabel = await executeMappedCommand(prediction.gesture, this.settings);
@@ -268,4 +279,3 @@ export function deactivate(): void {
   controller?.dispose();
   controller = undefined;
 }
-

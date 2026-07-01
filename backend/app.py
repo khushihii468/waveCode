@@ -19,13 +19,14 @@ MODEL_PATH = ROOT_DIR / "model" / "gesture_model.pkl"
 class WaveCodeBackend:
     def __init__(self) -> None:
         self.manager = ConnectionManager()
-        self.engine = GestureInferenceEngine(model_path=MODEL_PATH)
+        self.engine: GestureInferenceEngine | None = None
         self.publisher_task: asyncio.Task[None] | None = None
         self.running = False
 
     async def start(self) -> None:
         if self.running:
             return
+        self.engine = GestureInferenceEngine(model_path=MODEL_PATH)
         self.engine.start()
         self.running = True
         self.publisher_task = asyncio.create_task(self._publisher_loop(), name="wavecode-publisher")
@@ -37,11 +38,16 @@ class WaveCodeBackend:
             with suppress(asyncio.CancelledError):
                 await self.publisher_task
             self.publisher_task = None
-        self.engine.stop()
+        if self.engine is not None:
+            self.engine.stop()
+            self.engine = None
 
     async def _publisher_loop(self) -> None:
         while self.running:
-            message = self.engine.next_message()
+            if self.engine is None:
+                await asyncio.sleep(0.03)
+                continue
+            message = await asyncio.to_thread(self.engine.next_message)
             if self.manager.has_connections:
                 await self.manager.broadcast_json(message.payload)
             await asyncio.sleep(0.03)
@@ -95,4 +101,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

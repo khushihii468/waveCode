@@ -4,8 +4,8 @@ from dataclasses import dataclass
 from typing import Optional
 
 import cv2
-import mediapipe as mp
 import numpy as np
+from mediapipe.python.solutions.hands import Hands
 
 
 @dataclass
@@ -21,7 +21,7 @@ class MediaPipeHandDetector:
         min_detection_confidence: float = 0.6,
         min_tracking_confidence: float = 0.6,
     ) -> None:
-        self._hands = mp.solutions.hands.Hands(
+        self._hands = Hands(
             static_image_mode=False,
             max_num_hands=max_num_hands,
             min_detection_confidence=min_detection_confidence,
@@ -48,4 +48,3 @@ class MediaPipeHandDetector:
 
     def close(self) -> None:
         self._hands.close()
-
