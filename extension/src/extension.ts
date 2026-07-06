@@ -11,6 +11,7 @@ class WaveCodeController implements vscode.Disposable {
   private readonly statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
   private readonly lastGestureExecution = new Map<GestureId, number>();
   private lastCommandExecutionAt = 0;
+  private latchedGesture: GestureId | undefined;
   private readonly sidebar: WaveCodeSidebarProvider;
   private readonly backendProcess: BackendProcessManager;
   private readonly websocketClient: GestureWebSocketClient;
@@ -49,6 +50,9 @@ class WaveCodeController implements vscode.Disposable {
         void this.handlePrediction(prediction);
       },
       (status) => {
+        if (!status.handDetected || status.message === 'Gesture not recognized') {
+          this.resetGestureLatch();
+        }
         this.sidebar.updateState({
           cameraStatus: status.cameraConnected ? '🟢 Camera Connected' : '🔴 Camera Offline',
           statusMessage: status.message ?? (status.handDetected ? 'Listening...' : 'No hand detected'),
@@ -146,6 +150,7 @@ class WaveCodeController implements vscode.Disposable {
   private async stopRuntime(): Promise<void> {
     this.websocketClient.disconnect();
     await this.backendProcess.stop();
+    this.resetGestureLatch();
     this.sidebar.updateState({
       statusMessage: 'Detection disabled',
       connectionStatus: 'Disconnected',
@@ -181,6 +186,10 @@ class WaveCodeController implements vscode.Disposable {
       reconnecting: 'Reconnecting camera...',
     };
 
+    if (state !== 'connected') {
+      this.resetGestureLatch();
+    }
+
     this.sidebar.updateState({
       cameraStatus: cameraStatusMap[state],
       connectionStatus: labelMap[state],
@@ -203,15 +212,25 @@ class WaveCodeController implements vscode.Disposable {
     });
 
     if (!this.settings.enabled) {
+      this.resetGestureLatch();
       this.updateStatusBar('Disabled');
       return;
     }
 
     if (prediction.confidence < this.settings.recognitionThreshold) {
+      this.resetGestureLatch(prediction.gesture);
       this.sidebar.updateState({
         statusMessage: `Below threshold (${Math.round(this.settings.recognitionThreshold * 100)}%)`,
       });
       this.updateStatusBar('Low confidence');
+      return;
+    }
+
+    if (this.latchedGesture === prediction.gesture) {
+      this.sidebar.updateState({
+        statusMessage: 'Release gesture to retrigger',
+      });
+      this.updateStatusBar('Gesture latched');
       return;
     }
 
@@ -228,6 +247,7 @@ class WaveCodeController implements vscode.Disposable {
 
     this.lastGestureExecution.set(prediction.gesture, now);
     this.lastCommandExecutionAt = now;
+    this.latchedGesture = prediction.gesture;
 
     try {
       const actionLabel = await executeMappedCommand(prediction.gesture, this.settings);
@@ -264,6 +284,12 @@ class WaveCodeController implements vscode.Disposable {
 
   private updateStatusBar(status: string): void {
     this.statusBarItem.text = this.settings.enabled ? `$(radio-tower) WaveCode: ${status}` : '$(circle-slash) WaveCode Off';
+  }
+
+  private resetGestureLatch(gesture?: GestureId): void {
+    if (!gesture || this.latchedGesture === gesture) {
+      this.latchedGesture = undefined;
+    }
   }
 }
 
